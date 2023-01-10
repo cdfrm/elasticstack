@@ -1,0 +1,53 @@
+version: "3.5"
+
+services:
+  nginx:
+    image: nginx:latest
+    container_name: nginx
+    ports:
+      - "80:80"
+    volumes:
+      - "./config/nginx/:/etc/nginx/conf.d/"
+      - "./logs/nginx/:/var/log/nginx/"
+      - "./htdocs/:/var/www/html/"
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.9.3
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+    volumes:
+      - "./data/elastic/:/usr/share/elasticsearch/data/"
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:7.9.3
+    container_name: kibana
+    ports:
+      - '5601:5601'
+    environment:
+      ELASTICSEARCH_HOSTS: '["http://elasticsearch:9200"]'
+    depends_on:
+      - elasticsearch
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:7.9.3
+    container_name: logstash
+    command: logstash -f /config/
+    volumes:
+      - "./config/logstash/:/config/"
+    depends_on:
+      - elasticsearch
+
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:7.9.3
+    container_name: filebeat
+    volumes:
+      - "./data/filebeat:/usr/share/filebeat/data"
+      - "./config/filebeat/base/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro"
+      - "./config/filebeat/modules.d/:/usr/share/filebeat/modules.d/"
+      - "./logs:/var/logs"
+    command: ["--strict.perms=false"]
+    depends_on:
+      - logstash
+      - elasticsearch
+      - kibana
